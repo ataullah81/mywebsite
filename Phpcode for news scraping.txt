@@ -1,0 +1,73 @@
+<?php
+/**
+ * Plugin Name: Prothom Alo News Scraper
+ * Description: Scrapes and displays the latest headlines from the Prothom Alo website, linking each headline to the full article.
+ * Version: 1.1
+ * Author: Your Name
+ */
+
+function scrape_prothom_alo_news($url) {
+    // Send a GET request to the URL
+    $response = wp_remote_get($url);
+
+    // Check if the request was successful
+    if (is_wp_error($response)) {
+        return 'Failed to retrieve the webpage. Please check the URL.';
+    }
+
+    // Get the response body
+    $html = wp_remote_retrieve_body($response);
+
+    // Load the HTML content into DOMDocument for parsing
+    $dom = new DOMDocument();
+    @$dom->loadHTML($html);  // Suppress errors from malformed HTML
+
+    // Create a new DOMXPath instance to navigate the DOM
+    $xpath = new DOMXPath($dom);
+
+    // Find all <h3> tags containing headlines with links (adjust based on the website structure)
+    $headlines = $xpath->query('//h3/a');
+
+    // Extract and return headline text and URL
+    $news_headlines = [];
+    foreach ($headlines as $headline) {
+        $title = trim($headline->nodeValue);
+        $link = $headline->getAttribute('href');
+
+        // If the link is relative, prepend the base URL
+        if (strpos($link, 'http') !== 0) {
+            $link = rtrim($url, '/') . '/' . ltrim($link, '/');
+        }
+
+        $news_headlines[] = ['title' => $title, 'link' => $link];
+    }
+
+    return $news_headlines;
+}
+
+function display_prothom_alo_headlines($atts) {
+    // URL of Prothom Alo
+    $news_url = 'https://www.prothomalo.com/';
+
+    // Scrape the news headlines
+    $headlines = scrape_prothom_alo_news($news_url);
+
+    // If no headlines were found or an error occurred
+    if (empty($headlines)) {
+        return 'No headlines found. Please try again later.';
+    }
+
+    // Display the headlines as an unordered list with links
+    $output = '<ul>';
+    foreach ($headlines as $headline) {
+        $output .= '<li><a href="' . esc_url($headline['link']) . '" target="_blank">' . esc_html($headline['title']) . '</a></li>';
+    }
+    $output .= '</ul>';
+
+    return $output;
+}
+
+// Register the shortcode [prothom_alo_headlines] to display the headlines
+add_shortcode('prothom_alo_headlines', 'display_prothom_alo_headlines');
+
+?>
